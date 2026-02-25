@@ -1,0 +1,88 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  role      Role       @default(USER)
+  apiKey    String     @unique @default(cuid())
+  
+  moderationLogs ModerationLog[]
+  thresholds     Threshold[]
+  batchJobs      BatchJob[]
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model ModerationLog {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  text          String     @db.Text
+  probabilities Json       // { "toxic": 0.85, "severe_toxic": 0.2, ... }
+  flagged       Boolean    @default(false)
+  
+  createdAt     DateTime   @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Threshold {
+  id            String     @id @default(cuid())
+  label         String     // "toxic", "severe_toxic", "threat", etc.
+  value         Float      @default(0.5)
+  userId        String?
+  user          User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@unique([label, userId])
+  @@index([userId])
+}
+
+model BatchJob {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status          JobStatus  @default(PENDING)
+  fileName        String
+  totalRows       Int
+  processedRows   Int        @default(0)
+  flaggedCount    Int        @default(0)
+  
+  results         Json?      // Store batch results as JSON
+  error           String?
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
