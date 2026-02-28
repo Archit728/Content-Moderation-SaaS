@@ -50,7 +50,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-lg">
@@ -112,7 +112,7 @@ export function Navbar() {
                   <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-accent-foreground">
                     {session.user?.email?.[0].toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline text-sm max-w-[150px] truncate">
+                  <span className="hidden sm:inline text-sm max-w-37.5 truncate">
                     {session.user?.email}
                   </span>
                 </Button>

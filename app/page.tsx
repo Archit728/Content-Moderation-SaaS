@@ -84,7 +84,7 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <main className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
+      <main className="flex flex-col min-h-screen bg-linear-to-br from-background via-background to-accent/5">
         {/* Hero Section */}
         <section className="container mx-auto px-4 py-24 md:py-32 flex flex-col items-center justify-center text-center">
           <div className="max-w-3xl mx-auto space-y-8">
@@ -96,7 +96,7 @@ export default function Home() {
               </div>
               <h1 className="text-5xl md:text-6xl font-bold text-balance">
                 Enterprise Content{' '}
-                <span className="bg-gradient-to-r from-accent to-accent/60 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-accent to-accent/60 bg-clip-text text-transparent">
                   Moderation
                 </span>
               </h1>
@@ -197,7 +197,7 @@ export default function Home() {
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-3 text-sm">
-                      <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                      <Check className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
                       <span className="text-foreground">{feature}</span>
                     </li>
                   ))}

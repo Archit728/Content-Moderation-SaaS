@@ -154,15 +154,15 @@ export function SettingsTab() {
         </h3>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li className="flex gap-2">
-            <span className="font-medium text-foreground flex-shrink-0">0% (Allow All)</span>
+            <span className="font-medium text-foreground shrink-0">0% (Allow All)</span>
             <span>Flag nothing - content is never blocked</span>
           </li>
           <li className="flex gap-2">
-            <span className="font-medium text-foreground flex-shrink-0">50% (Medium)</span>
+            <span className="font-medium text-foreground shrink-0">50% (Medium)</span>
             <span>Balanced approach - blocks obvious violations</span>
           </li>
           <li className="flex gap-2">
-            <span className="font-medium text-foreground flex-shrink-0">100% (Block All)</span>
+            <span className="font-medium text-foreground shrink-0">100% (Block All)</span>
             <span>Block everything - no content passes</span>
           </li>
         </ul>
