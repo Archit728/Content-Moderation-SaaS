@@ -58,7 +58,7 @@ export default function SignIn() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-background via-background to-accent/5 p-4">
       <Card className="w-full max-w-md p-8 border border-border/40 shadow-xl">
         <div className="mb-8 text-center">
           <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center text-accent-foreground font-bold mx-auto mb-4">

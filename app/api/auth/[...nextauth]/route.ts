@@ -1,75 +1,76 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
-import { prisma } from '@/lib/prisma'
-import bcryptjs from 'bcryptjs'
-import { Role } from '@prisma/client'
+import { prisma } from "@/lib/prisma";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import bcryptjs from "bcryptjs";
+import NextAuth, { type NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password required')
+          throw new Error("Email and password required");
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
-        })
+          where: { email: credentials.email },
+        });
 
         if (!user) {
-          throw new Error('Invalid email or password')
+          throw new Error("Invalid email or password");
         }
 
         const isValid = await bcryptjs.compare(
           credentials.password,
           user.password
-        )
+        );
 
         if (!isValid) {
-          throw new Error('Invalid email or password')
+          throw new Error("Invalid email or password");
         }
 
         return {
           id: user.id,
           email: user.email,
-          role: user.role
-        }
-      }
-    })
+          role: user.role,
+        };
+      },
+    }),
   ],
   pages: {
-    signIn: '/auth/signin',
-    signUp: '/auth/signup',
-    error: '/auth/error'
+    signIn: "/auth/signin",
+    // signUp: "/auth/signup",
+    error: "/auth/error",
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role
+        token.id = user.id; 
+        token.role = user.role;
       }
-      return token
+      return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role
+        session.user.id = token.id as string;
+        session.user.role = token.role as "USER" | "ADMIN";
       }
-      return session
-    }
+      return session;
+    },
   },
   session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60 // 30 days
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET
-}
+  secret: process.env.NEXTAUTH_SECRET,
+};
 
-const handler = NextAuth(authOptions)
+const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST }
+export { handler as GET, handler as POST };
