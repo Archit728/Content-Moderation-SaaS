@@ -28,38 +28,30 @@ const buttonVariants = cva(
         "icon-sm": "size-8",
         "icon-lg": "size-10",
       },
-      fullWidth: {
-        true: "w-full", // adds width: 100%
-      },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
-      fullWidth: false,
     },
-  }
+  },
 );
-
-interface ButtonProps
-  extends React.ComponentProps<"button">,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-}
 
 function Button({
   className,
   variant,
   size,
-  fullWidth,
   asChild = false,
   ...props
-}: ButtonProps) {
+}: React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  }) {
   const Comp = asChild ? Slot : "button";
 
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, fullWidth, className }))}
+      className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   );

@@ -1,135 +1,635 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Loader2, Upload, FileText } from 'lucide-react'
-import { toast } from 'sonner'
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+
+interface Result {
+  id: string;
+  text: string;
+  probabilities: Record<string, number>;
+  flagged: boolean;
+  maxLabel: string;
+  maxScore: number;
+}
+
+interface BatchHistory {
+  id: string;
+  fileName: string;
+  status: string;
+  totalRows: number;
+  flaggedCount: number;
+  createdAt: string;
+  completionPercent: number;
+}
 
 export function BatchTab() {
-  const [isDragActive, setIsDragActive] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [results, setResults] = useState<any[] | null>(null)
-  const [batchId, setBatchId] = useState('')
+  const CURRENT_BATCH_ID_KEY = "currentBatchId";
+  const CURRENT_BATCH_RESULTS_KEY = "currentBatchResults";
+  const PENDING_UPLOAD_KEY = "batchUploadPending";
+  const PENDING_UPLOAD_STARTED_AT_KEY = "batchUploadStartedAt";
+
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("");
+  const [results, setResults] = useState<Result[] | null>(null);
+  const [batchId, setBatchId] = useState("");
+  const [batchUsage, setBatchUsage] = useState({
+    remaining: 0,
+    monthlyLimit: 1000,
+    tier: "FREE",
+  });
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<BatchHistory[]>([]);
+  const [selectedResult, setSelectedResult] = useState<Result | null>(null);
+  const [showResultDetail, setShowResultDetail] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [pendingBatchId, setPendingBatchId] = useState<string | null>(null);
+  const [isRecoveringPending, setIsRecoveringPending] = useState(false);
+  const isResolvingReadyRef = useRef(false);
+  // const safeParse = (value: string | null) => {
+  //   try {
+  //     return value ? JSON.parse(value) : null;
+  //   } catch {
+  //     return null;
+  //   }
+  // };
+  const [userId, setUserId] = useState<string | null>(null);
+  const getKey = (key: string) => {
+    if (!userId) return null;
+    return `batch_${userId}_${key}`;
+  };
+  const safeSetItem = (key: string | null, value: string) => {
+    if (!key) return;
+    sessionStorage.setItem(key, value);
+  };
+
+  const safeGetItem = (key: string | null) => {
+    if (!key) return null;
+    return sessionStorage.getItem(key);
+  };
+
+  const safeRemoveItem = (key: string | null) => {
+    if (!key) return;
+    sessionStorage.removeItem(key);
+  };
+  useEffect(() => {
+    const loadBatchUsage = async () => {
+      try {
+        const res = await fetch("/api/profile");
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (data.apiUsage && data.subscription && data.user) {
+          const used = data.apiUsage.currentMonthBatchCalls;
+          const monthlyLimit = data.subscription.monthlyBatchLimit;
+          setUserId(data.user.id);
+          setBatchUsage({
+            remaining: Math.max(monthlyLimit - used, 0),
+            monthlyLimit,
+            tier: data.subscription.tier,
+          });
+        }
+      } catch (err) {
+        console.error("Batch usage fetch failed:", err);
+      }
+    };
+
+    loadBatchUsage();
+  }, []);
+  const loadBatchResults = async (targetBatchId: string, notify = false) => {
+    if (isResolvingReadyRef.current) return false;
+    isResolvingReadyRef.current = true;
+
+    try {
+      const res = await fetch(`/api/batch-history/${targetBatchId}`);
+      if (!res.ok) throw new Error("Failed to fetch batch results");
+
+      const data = await res.json();
+      const loadedResults: Result[] = Array.isArray(data.results)
+        ? data.results
+        : [];
+
+      if (!loadedResults.length) return false;
+
+      setSelectedResult(null);
+      setShowResultDetail(false);
+      setBatchId(targetBatchId);
+      setResults(loadedResults);
+      setProgress(100);
+      setProgressStatus("Complete");
+      setIsLoading(false);
+      setPendingBatchId(null);
+      setIsRecoveringPending(false);
+      sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+      sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+      sessionStorage.setItem(
+        CURRENT_BATCH_RESULTS_KEY,
+        JSON.stringify(loadedResults),
+      );
+
+      if (notify) {
+        toast.success("Batch results are ready");
+      }
+
+      return true;
+    } finally {
+      isResolvingReadyRef.current = false;
+    }
+  };
+
+  const checkPendingBatchStatus = async (targetBatchId: string) => {
+    try {
+      const res = await fetch("/api/batch-history");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const jobs: BatchHistory[] = Array.isArray(data.batchJobs)
+        ? data.batchJobs
+        : [];
+      const current = jobs.find((job) => job.id === targetBatchId);
+
+      if (!current) return;
+
+      if (current.status === "COMPLETED") {
+        const loaded = await loadBatchResults(targetBatchId, true);
+        if (loaded) {
+          fetchBatchHistory();
+        }
+        return;
+      }
+
+      if (current.status === "FAILED") {
+        toast.error("Batch processing failed");
+        sessionStorage.removeItem(CURRENT_BATCH_ID_KEY);
+        sessionStorage.removeItem(CURRENT_BATCH_RESULTS_KEY);
+        sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+        sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+        setPendingBatchId(null);
+        setIsRecoveringPending(false);
+        setBatchId("");
+        setIsLoading(false);
+        setProgress(0);
+        setProgressStatus("");
+        return;
+      }
+
+      setProgress(0);
+      setProgressStatus("Your analysis is in progress. Please wait...");
+      setIsLoading(true);
+    } catch (error) {
+      console.error("Pending batch status check failed:", error);
+    }
+  };
+
+  const recoverPendingBatchFromHistory = async () => {
+    try {
+      const res = await fetch("/api/batch-history");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const jobs: BatchHistory[] = Array.isArray(data.batchJobs)
+        ? data.batchJobs
+        : [];
+      if (!jobs.length) return;
+
+      const startedAtRaw = sessionStorage.getItem(
+        PENDING_UPLOAD_STARTED_AT_KEY,
+      );
+      const startedAt = startedAtRaw ? Number(startedAtRaw) : NaN;
+      const threshold = Number.isFinite(startedAt)
+        ? startedAt - 120000
+        : Number.NEGATIVE_INFINITY;
+
+      const candidate = jobs.find((job) => {
+        const created = new Date(job.createdAt).getTime();
+        return created >= threshold;
+      });
+
+      if (!candidate) return;
+
+      sessionStorage.setItem(CURRENT_BATCH_ID_KEY, candidate.id);
+      setBatchId(candidate.id);
+      setPendingBatchId(candidate.id);
+      setIsRecoveringPending(false);
+
+      if (candidate.status === "COMPLETED") {
+        const loaded = await loadBatchResults(candidate.id, true);
+        if (loaded) {
+          fetchBatchHistory();
+        }
+        return;
+      }
+
+      if (candidate.status === "FAILED") {
+        toast.error("Batch processing failed");
+        sessionStorage.removeItem(CURRENT_BATCH_ID_KEY);
+        sessionStorage.removeItem(CURRENT_BATCH_RESULTS_KEY);
+        sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+        sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+        setPendingBatchId(null);
+        setBatchId("");
+        setIsLoading(false);
+        setProgress(0);
+        setProgressStatus("");
+        return;
+      }
+
+      setProgress(0);
+      setProgressStatus("Your analysis is in progress. Please wait...");
+      setIsLoading(true);
+    } catch (error) {
+      console.error("Pending batch recovery failed:", error);
+    }
+  };
+
+  // restore use-effect - runs immediately on mount
+  useEffect(() => {
+    const savedBatchId = sessionStorage.getItem(CURRENT_BATCH_ID_KEY);
+    const savedResults = sessionStorage.getItem(CURRENT_BATCH_RESULTS_KEY);
+    const hasPendingUpload =
+      sessionStorage.getItem(PENDING_UPLOAD_KEY) === "true";
+
+    if (savedResults && savedBatchId) {
+      try {
+        const parsed = JSON.parse(savedResults);
+        setBatchId(savedBatchId);
+        setResults(parsed);
+        setProgress(100);
+        setIsLoading(false);
+      } catch (e) {
+        console.error("restore failed", e);
+      }
+      return;
+    }
+
+    if (savedBatchId) {
+      setBatchId(savedBatchId);
+      setPendingBatchId(savedBatchId);
+      setIsLoading(true);
+      setProgressStatus("Processing in background...");
+      checkPendingBatchStatus(savedBatchId);
+      return;
+    }
+
+    if (hasPendingUpload) {
+      setIsRecoveringPending(true);
+      setIsLoading(true);
+      setProgressStatus("Reconnecting to your batch...");
+      recoverPendingBatchFromHistory();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!pendingBatchId && !isRecoveringPending) return;
+
+    const intervalId = setInterval(() => {
+      if (pendingBatchId) {
+        checkPendingBatchStatus(pendingBatchId);
+      } else if (isRecoveringPending) {
+        recoverPendingBatchFromHistory();
+      }
+    }, 2500);
+
+    return () => clearInterval(intervalId);
+  }, [pendingBatchId, isRecoveringPending]);
+
+  // const fetchBatchHistory = async () => {
+  //   try {
+  //     const res = await fetch("/api/batch-history");
+  //     if (!res.ok) throw new Error("Failed to fetch history");
+  //     const data = await res.json();
+  //     setHistory(data.batchJobs || []);
+  //   } catch (error) {
+  //     console.error("Error fetching history:", error);
+  //   }
+  // };
+  const fetchBatchHistory = async () => {
+    try {
+      setHistoryLoading(true);
+
+      const res = await fetch("/api/batch-history");
+      if (!res.ok) throw new Error("Failed to fetch history");
+
+      const data = await res.json();
+      setHistory(data.batchJobs || []);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchBatchHistory();
+  }, []);
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragActive(e.type === 'dragenter' || e.type === 'dragover')
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(e.type === "dragenter" || e.type === "dragover");
+  };
 
   const parseCSV = (text: string): string[] => {
-    const lines = text.trim().split('\n')
-    return lines.slice(1).map(line => {
-      const parts = line.split(',')
-      return parts[0] ? parts[0].replace(/^"|"$/g, '') : ''
-    }).filter(Boolean)
-  }
+    const lines = text.trim().split("\n");
+    return lines
+      .slice(1)
+      .map((line) => {
+        const parts = line.split(",");
+        return parts[0] ? parts[0].replace(/^"|"$/g, "") : "";
+      })
+      .filter(Boolean);
+  };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragActive(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
 
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      await processFile(files[0])
+    if (e.dataTransfer.files.length > 0) {
+      await processFile(e.dataTransfer.files[0]);
     }
-  }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      await processFile(e.target.files[0])
+    if (e.target.files?.length) {
+      await processFile(e.target.files[0]);
     }
-  }
+  };
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        if (isLoading) {
+          // still processing → keep UI consistent
+          setProgress((p) => (p < 90 ? p + 5 : p));
+        }
+      }
+    };
 
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isLoading]);
   const processFile = async (file: File) => {
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file')
-      return
+    if (isLoading) return;
+
+    if (!file.name.endsWith(".csv")) {
+      toast.error("Please upload a CSV file");
+      return;
+    }
+
+    if (!batchUsage) {
+      toast.error("Loading usage data...");
+      return;
+    }
+
+    if (batchUsage.remaining <= 0) {
+      toast.error("No batch requests remaining");
+      return;
     }
 
     try {
-      setIsLoading(true)
-      setProgress(0)
+      sessionStorage.setItem(PENDING_UPLOAD_KEY, "true");
+      sessionStorage.setItem(PENDING_UPLOAD_STARTED_AT_KEY, String(Date.now()));
+      sessionStorage.removeItem(CURRENT_BATCH_RESULTS_KEY);
 
-      const text = await file.text()
-      const texts = parseCSV(text)
+      setResults(null);
+      setShowHistory(false);
+      setSelectedResult(null);
+      setShowResultDetail(false);
+      setProgress(0);
+      setProgressStatus("");
+      setBatchId("");
+      setIsLoading(true);
+      setProgress(10);
+      setProgressStatus("Parsing CSV...");
 
-      if (texts.length === 0) {
-        toast.error('No valid rows found in CSV')
-        return
+      const text = await file.text();
+      const texts = parseCSV(text);
+
+      if (!texts.length) {
+        toast.error("No valid rows found");
+        return;
       }
 
       if (texts.length > 1000) {
-        toast.error('Maximum 1000 rows allowed')
-        return
+        toast.error("Maximum 1000 rows allowed");
+        return;
       }
 
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return prev
+      setProgress(25);
+      setProgressStatus("Uploading...");
+
+      const interval = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 90) {
+            clearInterval(interval);
+            return p;
           }
-          return prev + Math.random() * 30
-        })
-      }, 100)
+          return p + Math.random() * 10;
+        });
+      }, 200);
 
-      const res = await fetch('/api/moderate-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts })
-      })
+      const res = await fetch("/api/moderate-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts }),
+      });
 
-      clearInterval(progressInterval)
+      clearInterval(interval);
 
       if (!res.ok) {
-        throw new Error('Failed to process batch')
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Batch failed");
       }
 
-      const data = await res.json()
-      setProgress(100)
-      setBatchId(data.batchId)
-      setResults(data.results)
-      toast.success(`Processed ${texts.length} items successfully`)
-    } catch (error) {
-      toast.error('Failed to process file')
-      setProgress(0)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      const data = await res.json();
+      setProgress(100);
+      setProgressStatus("Complete");
 
+      // Always save batchId immediately (don't wait for results)
+      setBatchId(data.batchId);
+      sessionStorage.setItem(CURRENT_BATCH_ID_KEY, data.batchId);
+      setPendingBatchId(data.batchId);
+      setIsRecoveringPending(false);
+
+      // Only save results if they came back
+      if (
+        data.results &&
+        Array.isArray(data.results) &&
+        data.results.length > 0
+      ) {
+        sessionStorage.setItem(
+          CURRENT_BATCH_RESULTS_KEY,
+          JSON.stringify(data.results),
+        );
+        sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+        sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+        setResults(data.results);
+        setPendingBatchId(null);
+        toast.success(`Processed ${texts.length} items`);
+      } else {
+        // Keep upload locked and let status polling load final results.
+        setResults(null);
+        setIsLoading(true);
+        setProgress(0);
+        setProgressStatus("Your analysis is in progress. Please wait...");
+        checkPendingBatchStatus(data.batchId);
+        toast.message("Batch submitted. We will show results once ready.");
+      }
+
+      const usageKey = getKey("batchUsage");
+      if (usageKey) {
+        safeSetItem(usageKey, JSON.stringify(data.batchUsage));
+      }
+      setBatchUsage(data.batchUsage);
+
+      fetchBatchHistory();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to process file");
+      sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+      sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+      setProgress(0);
+      setProgressStatus("");
+      setPendingBatchId(null);
+      setIsRecoveringPending(false);
+    } finally {
+      const currentPendingId = sessionStorage.getItem(CURRENT_BATCH_ID_KEY);
+      const hasPendingUpload =
+        sessionStorage.getItem(PENDING_UPLOAD_KEY) === "true";
+      const shouldStayLoading = Boolean(currentPendingId) || hasPendingUpload;
+      setIsLoading(shouldStayLoading);
+    }
+  };
+
+  const handleResultClick = (result: Result) => {
+    setSelectedResult(result);
+    setShowResultDetail(true);
+  };
+
+  const handleClearResults = () => {
+    setResults(null);
+    setProgress(0);
+    setProgressStatus("");
+    setBatchId("");
+    setIsLoading(false);
+    setShowHistory(false);
+    setSelectedResult(null);
+    setShowResultDetail(false);
+    setPendingBatchId(null);
+    setIsRecoveringPending(false);
+
+    // Clear session storage
+    sessionStorage.removeItem(CURRENT_BATCH_ID_KEY);
+    sessionStorage.removeItem(CURRENT_BATCH_RESULTS_KEY);
+    sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+    sessionStorage.removeItem(PENDING_UPLOAD_STARTED_AT_KEY);
+
+    const usageKey = getKey("batchUsage");
+    if (usageKey) {
+      safeRemoveItem(usageKey);
+    }
+  };
+  const hasResults = Array.isArray(results) && results.length > 0;
   return (
     <div className="space-y-6">
-      {!results ? (
+      {showResultDetail && selectedResult && (
+        <Card className="p-6 border border-accent/50 bg-accent/5">
+          <div className="flex justify-between">
+            <h3 className="text-sm font-semibold">Detailed Analysis</h3>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setShowResultDetail(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <p className="text-sm bg-muted p-3 rounded mt-3">
+            {selectedResult.text}
+          </p>
+
+          <div className="mt-4 space-y-2">
+            {Object.entries(selectedResult.probabilities ?? {})
+              .sort((a, b) => b[1] - a[1])
+              .map(([label, score]) => (
+                <div key={label}>
+                  <div className="flex justify-between text-xs">
+                    <span>{label.replace(/_/g, " ")}</span>
+                    <span>{(score * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded">
+                    <div
+                      className="h-2 bg-accent"
+                      style={{ width: `${score * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
+      {!hasResults ? (
         <>
-          <div
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors duration-200 cursor-pointer ${
-              isDragActive
-                ? 'border-accent bg-accent/5'
-                : 'border-border/40 bg-muted/20 hover:border-border/60'
-            }`}
-          >
-            <div className="space-y-4">
-              <Upload className="w-12 h-12 text-muted-foreground mx-auto" />
-              <div>
-                <p className="text-foreground font-semibold">
-                  Drag and drop your CSV file here
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  or click below to select
-                </p>
+          <Card className="p-4 flex justify-between">
+            <div>
+              <p className="text-sm">Batch Remaining</p>
+              <p className="text-xs text-muted-foreground">
+                {batchUsage
+                  ? `${batchUsage.remaining} / ${batchUsage.monthlyLimit} (${batchUsage.tier})`
+                  : "Loading..."}{" "}
+              </p>
+            </div>
+          </Card>
+
+          {isLoading ? (
+            <Card className="p-4 border border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full" />
+                <div>
+                  <p className="text-sm font-medium">
+                    {progressStatus || "Processing..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {batchId
+                      ? "Results will appear when ready"
+                      : "Upload in progress"}
+                  </p>
+                </div>
               </div>
-              <label>
+              {progress > 0 && progress < 100 && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Upload Progress</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} />
+                </div>
+              )}
+            </Card>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setShowHistory((prev) => !prev)}
+              >
+                {showHistory ? "Hide History" : "View History"}
+              </Button>
+              <div
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                className="border-2 border-dashed p-12 text-center"
+              >
+                <Upload className="mx-auto mb-2" />
                 <input
                   type="file"
                   accept=".csv"
@@ -138,109 +638,117 @@ export function BatchTab() {
                   className="hidden"
                 />
                 <Button
-                  type="button"
-                  variant="outline"
                   disabled={isLoading}
-                  onClick={() => {
-                    const input = document.querySelector('input[type="file"]') as HTMLInputElement
-                    input?.click()
-                  }}
+                  onClick={() =>
+                    (
+                      document.querySelector(
+                        'input[type="file"]',
+                      ) as HTMLInputElement
+                    )?.click()
+                  }
                 >
-                  {isLoading ? 'Processing...' : 'Select File'}
+                  Select File
                 </Button>
-              </label>
-              <p className="text-xs text-muted-foreground mt-4">
-                Maximum 1,000 rows. CSV format with content in first column.
-              </p>
-            </div>
-          </div>
-
-          {isLoading && (
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Processing batch...</span>
-                  <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
-                </div>
-                <Progress value={progress} />
               </div>
-            </Card>
+
+              {showHistory ? (
+                <div className="space-y-2">
+                  {historyLoading ? (
+                    <p className="text-sm text-muted-foreground">
+                      Loading history...
+                    </p>
+                  ) : history.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No batch history available
+                    </p>
+                  ) : (
+                    history.map((job) => (
+                      <Card
+                        key={job.id}
+                        className="p-3 cursor-pointer hover:bg-muted"
+                        onClick={async () => {
+                          try {
+                            console.log("CLICKED JOB ID:", job.id);
+                            const res = await fetch(
+                              `/api/batch-history/${job.id}`,
+                            );
+                            console.log("STATUS:", res.status);
+                            if (!res.ok)
+                              throw new Error("Failed to fetch batch");
+
+                            const data = await res.json();
+
+                            // Reset detail view BEFORE setting new batch
+                            setSelectedResult(null);
+                            setShowResultDetail(false);
+
+                            setBatchId(job.id);
+                            setResults(data.results);
+
+                            setShowHistory(false);
+
+                            // Save to session storage using simple keys
+                            sessionStorage.setItem(
+                              CURRENT_BATCH_ID_KEY,
+                              job.id,
+                            );
+                            sessionStorage.setItem(
+                              CURRENT_BATCH_RESULTS_KEY,
+                              JSON.stringify(data.results),
+                            );
+                            sessionStorage.removeItem(PENDING_UPLOAD_KEY);
+                            sessionStorage.removeItem(
+                              PENDING_UPLOAD_STARTED_AT_KEY,
+                            );
+                            setPendingBatchId(null);
+                            setIsRecoveringPending(false);
+                          } catch (err) {
+                            toast.error("Failed to load batch");
+                          }
+                        }}
+                      >
+                        <p className="text-sm font-medium">
+                          {job.fileName || "Batch"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {job.totalRows} rows • {job.flaggedCount} flagged
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(job.createdAt).toLocaleString()}
+                        </p>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </>
           )}
         </>
       ) : (
         <>
-          <Card className="p-6 border-accent/30 bg-accent/5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Batch ID</p>
-                <p className="font-mono text-sm font-medium">{batchId.slice(0, 8)}...</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold">{results.length}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Flagged</p>
-                <p className="text-2xl font-bold text-red-500">
-                  {results.filter((r: any) => r.flagged).length}
-                </p>
-              </div>
-            </div>
+          <Card className="p-4">
+            <p>Total: {results.length}</p>
+            <p>Flagged: {results.filter((r) => r.flagged).length}</p>
           </Card>
 
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Results Preview
-            </h3>
-            <div className="max-h-96 overflow-y-auto space-y-2">
-              {results.slice(0, 10).map((result: any, idx: number) => (
-                <Card
-                  key={idx}
-                  className={`p-3 border transition-colors ${
-                    result.flagged
-                      ? 'border-red-500/30 bg-red-500/5'
-                      : 'border-green-500/30 bg-green-500/5'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {result.text}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {result.maxLabel.replace(/_/g, ' ')} • {(result.maxScore * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded whitespace-nowrap ${
-                      result.flagged
-                        ? 'bg-red-500/20 text-red-600 dark:text-red-400'
-                        : 'bg-green-500/20 text-green-600 dark:text-green-400'
-                    }`}>
-                      {result.flagged ? 'Flagged' : 'Safe'}
-                    </span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            {results.length > 10 && (
-              <p className="text-xs text-muted-foreground text-center py-2">
-                +{results.length - 10} more items
-              </p>
-            )}
+          <div className="space-y-2">
+            {results.map((r, i) => (
+              <Card
+                key={i}
+                onClick={() => handleResultClick(r)}
+                className="p-3 cursor-pointer"
+              >
+                <p className="text-sm truncate">{r.text}</p>
+                <p className="text-xs">
+                  {r.maxLabel} • {(r.maxScore * 100).toFixed(0)}%
+                </p>
+              </Card>
+            ))}
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => {
-              setResults(null)
-              setProgress(0)
-              setBatchId('')
-            }}
-          >
-            Process Another File
-          </Button>
+          <Button onClick={handleClearResults}>Process Another File</Button>
         </>
       )}
     </div>
-  )
+  );
 }

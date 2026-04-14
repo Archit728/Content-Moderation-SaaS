@@ -11,16 +11,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // const userThresholds = await prisma.threshold.findMany({
-    //   where: { userId: session.user.id },
-    // });
+    const userId = session.user.id;
 
-    // Use raw query instead of findMany() for transaction-mode pooler
+    // Raw query (pooler-safe)
     const userThresholds = await prisma.$queryRaw<
       { id: string; label: string; value: number }[]
-    >`SELECT * FROM "Threshold" WHERE "userId" = ${session.user.id}`;
+    >`SELECT * FROM "Threshold" WHERE "userId" = ${userId}`;
 
-    // Build response with defaults for missing labels
     const thresholds: Record<string, number> = {};
     LABELS.forEach((label) => {
       const threshold = userThresholds.find((t) => t.label === label);
@@ -32,69 +29,10 @@ export async function GET(request: NextRequest) {
     console.error("Get thresholds error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
-// export async function POST(request: NextRequest) {
-//   try {
-//     const session = await getSession();
-//     if (!session?.user?.id) {
-//       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-//     }
-
-//     const body = await request.json();
-//     const validation = UpdateThresholdsSchema.safeParse(body);
-
-//     if (!validation.success) {
-//       return NextResponse.json(
-//         { error: validation.error.errors[0].message },
-//         { status: 400 }
-//       );
-//     }
-
-//     const { thresholds } = validation.data;
-
-//     // Update thresholds
-//     // for (const [label, value] of Object.entries(thresholds)) {
-//     //   await prisma.threshold.upsert({
-//     //     where: {
-//     //       label_userId: {
-//     //         label,
-//     //         userId: session.user.id
-//     //       }
-//     //     },
-//     //     update: { value },
-//     //     create: {
-//     //       label,
-//     //       value,
-//     //       userId: session.user.id
-//     //     }
-//     //   })
-//     // }
-//     // To prevent your API from crashing if the DB is down, wrap the upsert in a try/catch:
-//     for (const [label, value] of Object.entries(thresholds)) {
-//       try {
-//         await prisma.threshold.upsert({
-//           where: { label_userId: { label, userId: session.user.id } },
-//           update: { value },
-//           create: { label, value, userId: session.user.id },
-//         });
-//       } catch (err) {
-//         console.error(`Failed to update threshold for ${label}:`, err);
-//       }
-//     }
-
-//     return NextResponse.json({ success: true });
-//   } catch (error) {
-//     console.error("Update thresholds error:", error);
-//     return NextResponse.json(
-//       { error: "Internal server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,45 +47,49 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         { error: validation.error.errors[0].message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const { thresholds } = validation.data;
+    const userId = session.user.id;
 
-    // Update thresholds safely without upsert
-    for (const [label, value] of Object.entries(thresholds)) {
-      if (!LABELS.includes(label)) continue;
+    // Raw fetch existing thresholds
+    const existingThresholds = await prisma.$queryRaw<
+      { id: string; label: string; value: number }[]
+    >`SELECT * FROM "Threshold" WHERE "userId" = ${userId}`;
 
-      try {
-        // Check if the threshold exists
-        const existing = await prisma.threshold.findFirst({
-          where: { userId: session.user.id, label },
-        });
+    const existingMap = new Map(existingThresholds.map((t) => [t.label, t]));
+
+    await prisma.$transaction(async (tx) => {
+      for (const [label, value] of Object.entries(thresholds)) {
+        if (!LABELS.includes(label)) continue;
+
+        const existing = existingMap.get(label);
 
         if (existing) {
-          // Update if it exists
-          await prisma.threshold.update({
+          await tx.threshold.update({
             where: { id: existing.id },
             data: { value },
           });
         } else {
-          // Create if missing
-          await prisma.threshold.create({
-            data: { label, value, userId: session.user.id },
+          await tx.threshold.create({
+            data: {
+              label,
+              value,
+              userId,
+            },
           });
         }
-      } catch (err) {
-        console.error(`Failed to update threshold for ${label}:`, err);
       }
-    }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Update thresholds error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

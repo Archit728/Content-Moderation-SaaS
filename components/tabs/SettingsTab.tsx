@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { ThresholdSlider } from '@/components/ThresholdSlider'
-import { Loader2, RotateCcw, Save } from 'lucide-react'
-import { toast } from 'sonner'
-import { LABELS } from '@/lib/moderation'
+import { ThresholdSlider } from "@/components/ThresholdSlider";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { LABELS } from "@/lib/moderation";
+import { Loader2, RotateCcw, Save } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const DEFAULT_THRESHOLDS: Record<string, number> = {
   toxic: 0.5,
@@ -14,71 +14,74 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
   obscene: 0.5,
   threat: 0.6,
   insult: 0.5,
-  identity_hate: 0.4
-}
+  identity_hate: 0.4,
+};
 
 export function SettingsTab() {
-  const [thresholds, setThresholds] = useState<Record<string, number>>(DEFAULT_THRESHOLDS)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
+  const [thresholds, setThresholds] =
+    useState<Record<string, number>>(DEFAULT_THRESHOLDS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    fetchThresholds()
-  }, [])
+    fetchThresholds();
+  }, []);
 
   const fetchThresholds = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch('/api/thresholds')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setThresholds(data)
-      setIsLoading(false)
+      const res = await fetch("/api/thresholds");
+      if (!res.ok) throw new Error("Failed to fetch");
+
+      const data = await res.json();
+      setThresholds(data);
     } catch (error) {
-      toast.error('Failed to load thresholds')
-      setIsLoading(false)
+      toast.error("Failed to load thresholds");
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleThresholdChange = (label: string, value: number) => {
-    setThresholds(prev => ({
+    setThresholds((prev) => ({
       ...prev,
-      [label]: value
-    }))
-    setHasChanges(true)
-  }
+      [label]: value,
+    }));
+    setHasChanges(true);
+  };
 
   const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      const res = await fetch('/api/thresholds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thresholds })
-      })
+      const res = await fetch("/api/thresholds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thresholds }),
+      });
 
-      if (!res.ok) throw new Error('Failed to save')
+      if (!res.ok) throw new Error("Failed to save");
 
-      toast.success('Thresholds saved successfully')
-      setHasChanges(false)
+      toast.success("Thresholds saved successfully");
+      setHasChanges(false);
     } catch (error) {
-      toast.error('Failed to save thresholds')
+      toast.error("Failed to save thresholds");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleReset = () => {
-    setThresholds(DEFAULT_THRESHOLDS)
-    setHasChanges(true)
-  }
+    setThresholds({ ...DEFAULT_THRESHOLDS });
+    setHasChanges(true);
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -89,7 +92,8 @@ export function SettingsTab() {
           Customize Detection Sensitivity
         </h3>
         <p className="text-sm text-muted-foreground">
-          Adjust the confidence thresholds for each toxicity category. Higher values = stricter filtering.
+          Adjust the confidence thresholds for each toxicity category. Higher
+          values = stricter filtering.
         </p>
       </Card>
 
@@ -98,13 +102,13 @@ export function SettingsTab() {
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
           Toxicity Thresholds
         </h3>
-        {LABELS.map(label => (
+        {LABELS.map((label) => (
           <ThresholdSlider
             key={label}
             label={label}
             value={thresholds[label] ?? 0.5}
             onChange={(value) => handleThresholdChange(label, value)}
-            description={`Adjust sensitivity for ${label.replace(/_/g, ' ')}`}
+            description={`Adjust sensitivity for ${label.replace(/_/g, " ")}`}
           />
         ))}
       </div>
@@ -154,19 +158,25 @@ export function SettingsTab() {
         </h3>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li className="flex gap-2">
-            <span className="font-medium text-foreground shrink-0">0% (Allow All)</span>
+            <span className="font-medium text-foreground flex-shrink-0">
+              0% (Allow All)
+            </span>
             <span>Flag nothing - content is never blocked</span>
           </li>
           <li className="flex gap-2">
-            <span className="font-medium text-foreground shrink-0">50% (Medium)</span>
+            <span className="font-medium text-foreground flex-shrink-0">
+              50% (Medium)
+            </span>
             <span>Balanced approach - blocks obvious violations</span>
           </li>
           <li className="flex gap-2">
-            <span className="font-medium text-foreground shrink-0">100% (Block All)</span>
+            <span className="font-medium text-foreground flex-shrink-0">
+              100% (Block All)
+            </span>
             <span>Block everything - no content passes</span>
           </li>
         </ul>
       </Card>
     </div>
-  )
+  );
 }

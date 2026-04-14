@@ -17,39 +17,87 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         { error: validation.error.errors[0].message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const { text } = validation.data;
+    const userId = session.user.id;
 
-    // // Get user's thresholds (fallback to defaults)
-    // const userThresholds = await prisma.threshold.findMany({
-    //   where: { userId: session.user.id }
-    // })
-    // Use raw query instead of findMany() for transaction-mode pooler
+    // Fetch API usage and subscription
+    const apiUsage = await prisma.apiUsage.findUnique({
+      where: { userId },
+    });
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!apiUsage || !subscription) {
+      return NextResponse.json(
+        { error: "Subscription not found" },
+        { status: 400 },
+      );
+    }
+
+    // Enforce monthly API limit
+    if (apiUsage.currentMonthApiCalls >= subscription.monthlyApiLimit) {
+      return NextResponse.json(
+        {
+          error: "API call limit exceeded for this month",
+          remainingCalls: 0,
+          monthlyLimit: subscription.monthlyApiLimit,
+          subscriptionTier: subscription.tier,
+        },
+        { status: 429 },
+      );
+    }
+
+    // Use raw query for threshold fetch (pooler-safe)
     const userThresholds = await prisma.$queryRaw<
       { id: string; label: string; value: number }[]
-    >`SELECT * FROM "Threshold" WHERE "userId" = ${session.user.id}`;
+    >`SELECT * FROM "Threshold" WHERE "userId" = ${userId}`;
 
+    // Build threshold map
     const thresholds: Record<string, number> = {};
     LABELS.forEach((label) => {
       const threshold = userThresholds.find((t) => t.label === label);
       thresholds[label] = threshold?.value ?? 0.5;
     });
 
-    // Moderate the text
+    // Perform moderation
     const result = await moderateText(text, thresholds);
 
-    // Save to database
-    const log = await prisma.moderationLog.create({
-      data: {
-        userId: session.user.id,
-        text,
-        probabilities: result.probabilities,
-        flagged: result.flagged,
-      },
+    // Transaction: log + atomic usage increment
+    const log = await prisma.$transaction(async (tx) => {
+      const createdLog = await tx.moderationLog.create({
+        data: {
+          userId,
+          text,
+          probabilities: result.probabilities,
+          flagged: result.flagged,
+        },
+      });
+
+      await tx.apiUsage.update({
+        where: { userId },
+        data: {
+          currentMonthApiCalls: {
+            increment: 1,
+          },
+        },
+      });
+
+      return createdLog;
     });
+
+    // Calculate updated usage safely (without trusting stale value)
+    const updatedUsage = await prisma.apiUsage.findUnique({
+      where: { userId },
+    });
+
+    const used = updatedUsage?.currentMonthApiCalls ?? 0;
+    const remaining = Math.max(subscription.monthlyApiLimit - used, 0);
 
     return NextResponse.json({
       id: log.id,
@@ -58,12 +106,18 @@ export async function POST(request: NextRequest) {
       maxLabel: result.maxLabel,
       maxScore: result.maxScore,
       createdAt: log.createdAt,
+      apiUsage: {
+        used,
+        remaining,
+        monthlyLimit: subscription.monthlyApiLimit,
+        tier: subscription.tier,
+      },
     });
   } catch (error) {
     console.error("Moderation API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

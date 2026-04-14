@@ -31,18 +31,43 @@ export function generateMockProbabilities(): Record<string, number> {
 /**
  * Check if content is flagged based on thresholds
  */
+// export function checkIfFlagged(
+//   probabilities: Record<string, number>,
+//   thresholds: Record<string, number>,
+// ): boolean {
+//   return Object.entries(probabilities).some(
+//     ([label, score]) => score >= (thresholds[label] ?? 0.5),
+//   );
+// }
 export function checkIfFlagged(
   probabilities: Record<string, number>,
-  thresholds: Record<string, number>
+  thresholds: Record<string, number>,
 ): boolean {
-  return Object.entries(probabilities).some(
-    ([label, score]) => score >= (thresholds[label] ?? 0.5)
-  );
+  return Object.entries(probabilities).some(([label, score]) => {
+    const threshold = thresholds[label] ?? 0.5;
+    return score >= threshold;
+  });
 }
 
 /**
  * Get the max scoring label
  */
+// export function getMaxLabel(probabilities: Record<string, number>): {
+//   label: string;
+//   score: number;
+// } {
+//   let maxLabel = "";
+//   let maxScore = 0;
+
+//   Object.entries(probabilities).forEach(([label, score]) => {
+//     if (score > maxScore) {
+//       maxScore = score;
+//       maxLabel = label;
+//     }
+//   });
+
+//   return { label: maxLabel, score: maxScore };
+// }
 export function getMaxLabel(probabilities: Record<string, number>): {
   label: string;
   score: number;
@@ -50,12 +75,12 @@ export function getMaxLabel(probabilities: Record<string, number>): {
   let maxLabel = "";
   let maxScore = 0;
 
-  Object.entries(probabilities).forEach(([label, score]) => {
+  for (const [label, score] of Object.entries(probabilities)) {
     if (score > maxScore) {
       maxScore = score;
       maxLabel = label;
     }
-  });
+  }
 
   return { label: maxLabel, score: maxScore };
 }
@@ -180,7 +205,7 @@ async function getClient() {
 
 export async function moderateText(
   text: string,
-  thresholds: Record<string, number>
+  thresholds: Record<string, number>,
 ): Promise<ModerationResult> {
   // const client = await Client.connect("Archit31/Content-Moderation-SaaS");
   const client = await getClient();
@@ -211,12 +236,20 @@ export async function moderateText(
   let maxLabel = "";
   let maxScore = 0;
 
-  for (const label of LABELS) {
-    const score = probabilities[label];
+  // for (const label of LABELS) {
+  //   const score = probabilities[label];
 
-    if (score >= (thresholds[label] ?? 0.5)) {
-      flagged = true;
-    }
+  //   if (score >= (thresholds[label] ?? 0.5)) {
+  //     flagged = true;
+  //   }
+
+  //   if (score > maxScore) {
+  //     maxScore = score;
+  //     maxLabel = label;
+  //   }
+  // }
+  for (const [label, score] of Object.entries(probabilities)) {
+    if (score >= (thresholds[label] ?? 0.5)) flagged = true;
 
     if (score > maxScore) {
       maxScore = score;

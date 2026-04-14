@@ -8,49 +8,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Moon, Settings, Shield, Sun } from "lucide-react";
+import { LogOut, Moon, Shield, Sun, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) return null;
-
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={toggleTheme}
-      className="w-9 h-9"
-    >
-      {theme === "dark" ? (
-        <Sun className="w-4 h-4" />
-      ) : (
-        <Moon className="w-4 h-4" />
-      )}
-    </Button>
-  );
-}
-
 export function Navbar() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  if (!mounted) return null;
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-lg">
@@ -60,7 +39,7 @@ export function Navbar() {
           <span className="hidden sm:inline">ContentGuard</span>
         </Link>
 
-        {/* Center - Nav Links (Desktop) */}
+        {/* Nav */}
         {session && (
           <nav className="hidden md:flex items-center gap-1">
             <Link href="/dashboard">
@@ -68,6 +47,7 @@ export function Navbar() {
                 Dashboard
               </Button>
             </Link>
+
             {session.user?.role === "ADMIN" && (
               <Link href="/admin">
                 <Button
@@ -83,24 +63,23 @@ export function Navbar() {
           </nav>
         )}
 
-        {/* Right Side Actions */}
+        {/* Right */}
         <div className="flex items-center gap-2">
-          {/* Theme Toggle */}
-          {/* <Button
+          {/* Theme toggle (safe after mount fix) */}
+          <Button
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
             className="w-9 h-9"
           >
-            {theme === 'dark' ? (
+            {theme === "dark" ? (
               <Sun className="w-4 h-4" />
             ) : (
               <Moon className="w-4 h-4" />
             )}
-          </Button> */}
-          <ThemeToggle />
+          </Button>
 
-          {/* User Menu */}
+          {/* User menu */}
           {session ? (
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
               <DropdownMenuTrigger asChild>
@@ -112,26 +91,31 @@ export function Navbar() {
                   <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-accent-foreground">
                     {session.user?.email?.[0].toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline text-sm max-w-37.5 truncate">
+                  <span className="hidden sm:inline text-sm max-w-[150px] truncate">
                     {session.user?.email}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
                   {session.user?.email}
                 </div>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem asChild>
                   <Link
-                    href="/dashboard/settings"
+                    href="/dashboard/edit-profile"
                     className="flex items-center gap-2 cursor-pointer"
                   >
-                    <Settings className="w-4 h-4" />
-                    <span>Settings</span>
+                    <User className="w-4 h-4" />
+                    <span>Edit Profile</span>
                   </Link>
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   onClick={() => signOut({ callbackUrl: "/" })}
                   className="text-red-600 dark:text-red-400 flex items-center gap-2 cursor-pointer"

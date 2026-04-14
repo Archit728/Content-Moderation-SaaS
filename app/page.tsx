@@ -1,85 +1,98 @@
-import { Navbar } from '@/components/Navbar'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { ArrowRight, Shield, Zap, BarChart3, Lock, AlertCircle, Check } from 'lucide-react'
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import {
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Check,
+  Lock,
+  Shield,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const features = [
     {
       icon: Shield,
-      title: 'AI-Powered Detection',
-      description: 'Advanced BERT-based model for multi-label toxicity detection with high accuracy'
+      title: "AI-Powered Detection",
+      description:
+        "Advanced BERT-based model for multi-label toxicity detection with high accuracy",
     },
     {
       icon: Zap,
-      title: 'Real-Time Analysis',
-      description: 'Instant content moderation results with millisecond response times'
+      title: "Real-Time Analysis",
+      description:
+        "Instant content moderation results with millisecond response times",
     },
     {
       icon: BarChart3,
-      title: 'Advanced Analytics',
-      description: 'Comprehensive dashboards with trends, patterns, and detailed insights'
+      title: "Advanced Analytics",
+      description:
+        "Comprehensive dashboards with trends, patterns, and detailed insights",
     },
     {
       icon: Lock,
-      title: 'Secure & Private',
-      description: 'Enterprise-grade security with end-to-end encryption and data privacy'
+      title: "Secure & Private",
+      description:
+        "Enterprise-grade security with end-to-end encryption and data privacy",
     },
     {
       icon: AlertCircle,
-      title: 'Custom Thresholds',
-      description: 'Fine-tune detection sensitivity for each content category'
+      title: "Custom Thresholds",
+      description: "Fine-tune detection sensitivity for each content category",
     },
     {
       icon: BarChart3,
-      title: 'Batch Processing',
-      description: 'Process up to 1,000 items at once for efficient bulk moderation'
-    }
-  ]
+      title: "Batch Processing",
+      description:
+        "Process up to 1,000 items at once for efficient bulk moderation",
+    },
+  ];
 
   const plans = [
     {
-      name: 'Starter',
-      price: 'Free',
-      description: 'Perfect for getting started',
+      name: "Starter",
+      price: "Free",
+      description: "Perfect for getting started",
       features: [
-        'Up to 1,000 moderation requests/month',
-        '6 toxicity labels',
-        'Basic analytics',
-        'Custom thresholds',
-        'Email support'
-      ]
-    },
-    {
-      name: 'Professional',
-      price: '$99',
-      period: '/month',
-      description: 'For growing teams',
-      features: [
-        'Unlimited moderation requests',
-        '6 toxicity labels',
-        'Advanced analytics',
-        'Custom thresholds',
-        'Batch processing (10,000/month)',
-        'API access',
-        'Priority support'
+        "Up to 1,000 moderation requests/month",
+        "6 toxicity labels",
+        "Basic analytics",
+        "Custom thresholds",
+        "Email support",
       ],
-      highlighted: true
     },
     {
-      name: 'Enterprise',
-      price: 'Custom',
-      description: 'For large organizations',
+      name: "Professional",
+      price: "$99",
+      period: "/month",
+      description: "For growing teams",
       features: [
-        'Unlimited everything',
-        'Custom model training',
-        'Dedicated support',
-        'SLA guarantee',
-        'On-premise deployment',
-        'Custom integrations'
-      ]
-    }
-  ]
+        "Unlimited moderation requests",
+        "6 toxicity labels",
+        "Advanced analytics",
+        "Custom thresholds",
+        "Batch processing (10,000/month)",
+        "API access",
+        "Priority support",
+      ],
+      highlighted: true,
+    },
+    {
+      name: "Enterprise",
+      price: "Custom",
+      description: "For large organizations",
+      features: [
+        "Unlimited everything",
+        "Custom model training",
+        "Dedicated support",
+        "SLA guarantee",
+        "On-premise deployment",
+        "Custom integrations",
+      ],
+    },
+  ];
 
   return (
     <>
@@ -95,13 +108,15 @@ export default function Home() {
                 </span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold text-balance">
-                Enterprise Content{' '}
+                Enterprise Content{" "}
                 <span className="bg-linear-to-r from-accent to-accent/60 bg-clip-text text-transparent">
                   Moderation
                 </span>
               </h1>
               <p className="text-lg md:text-xl text-muted-foreground text-balance">
-                Keep your platform safe with AI-powered toxicity detection. Real-time analysis, comprehensive analytics, and custom thresholds for your content.
+                Keep your platform safe with AI-powered toxicity detection.
+                Real-time analysis, comprehensive analytics, and custom
+                thresholds for your content.
               </p>
             </div>
 
@@ -137,7 +152,9 @@ export default function Home() {
         {/* Features Section */}
         <section className="container mx-auto px-4 py-24 md:py-32">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Powerful Features</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Powerful Features
+            </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Everything you need to moderate content at scale with confidence
             </p>
@@ -145,19 +162,21 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => {
-              const Icon = feature.icon
+              const Icon = feature.icon;
               return (
                 <div
                   key={feature.title}
                   className="p-6 rounded-lg border border-border/40 bg-card hover:border-border/80 hover:shadow-lg transition-all duration-300"
                 >
                   <Icon className="w-8 h-8 text-accent mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {feature.title}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {feature.description}
                   </p>
                 </div>
-              )
+              );
             })}
           </div>
         </section>
@@ -165,7 +184,9 @@ export default function Home() {
         {/* Pricing Section */}
         <section className="container mx-auto px-4 py-24 md:py-32">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Simple Pricing</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Simple Pricing
+            </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Start free, scale as you grow
             </p>
@@ -177,8 +198,8 @@ export default function Home() {
                 key={plan.name}
                 className={`p-8 rounded-lg border transition-all duration-300 flex flex-col ${
                   plan.highlighted
-                    ? 'border-accent bg-card shadow-xl scale-105'
-                    : 'border-border/40 bg-card hover:border-border/80'
+                    ? "border-accent bg-card shadow-xl scale-105"
+                    : "border-border/40 bg-card hover:border-border/80"
                 }`}
               >
                 <div className="mb-6">
@@ -189,14 +210,19 @@ export default function Home() {
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">{plan.price}</span>
                     {plan.period && (
-                      <span className="text-muted-foreground">{plan.period}</span>
+                      <span className="text-muted-foreground">
+                        {plan.period}
+                      </span>
                     )}
                   </div>
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3 text-sm">
+                    <li
+                      key={feature}
+                      className="flex items-start gap-3 text-sm"
+                    >
                       <Check className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
                       <span className="text-foreground">{feature}</span>
                     </li>
@@ -205,8 +231,8 @@ export default function Home() {
 
                 <Button
                   asChild
-                  fullWidth
-                  variant={plan.highlighted ? 'default' : 'outline'}
+                  className="w-full"
+                  variant={plan.highlighted ? "default" : "outline"}
                 >
                   <Link href="/auth/signup">Get Started</Link>
                 </Button>
@@ -218,9 +244,12 @@ export default function Home() {
         {/* CTA Section */}
         <section className="container mx-auto px-4 py-24 md:py-32">
           <div className="max-w-3xl mx-auto p-12 rounded-lg border border-accent/30 bg-accent/5 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to get started?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Ready to get started?
+            </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Join thousands of organizations using ContentGuard to moderate content at scale.
+              Join thousands of organizations using ContentGuard to moderate
+              content at scale.
             </p>
             <Button size="lg" asChild>
               <Link href="/auth/signup">Create Free Account</Link>
@@ -246,5 +275,5 @@ export default function Home() {
         </footer>
       </main>
     </>
-  )
+  );
 }

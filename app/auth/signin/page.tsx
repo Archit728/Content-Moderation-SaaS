@@ -1,64 +1,70 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
-import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function SignIn() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: 'demo@example.com',
-    password: 'demo@1234'
-  })
+    email: "demo@example.com",
+    password: "demo@1234",
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
-      const result = await signIn('credentials', {
+      const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
-        redirect: false
-      })
+        redirect: false,
+      });
 
+      // if (result?.error) {
+      //   toast.error(result.error || "Failed to sign in");
+      // } else {
+      //   toast.success("Signed in successfully");
+      //   router.push("/dashboard");
+      // }
       if (result?.error) {
-        toast.error(result.error || 'Failed to sign in')
+        toast.error("Invalid email or password");
       } else {
-        toast.success('Signed in successfully')
-        router.push('/dashboard')
+        toast.success("Signed in successfully");
+        router.push("/dashboard");
       }
     } catch (error) {
-      toast.error('An error occurred')
+      toast.error("An error occurred");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fillDemoCredentials = () => {
     setFormData({
-      email: 'demo@example.com',
-      password: 'demo@1234'
-    })
-  }
+      email: "demo@example.com",
+      password: "demo@1234",
+    });
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-background via-background to-accent/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
       <Card className="w-full max-w-md p-8 border border-border/40 shadow-xl">
         <div className="mb-8 text-center">
           <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center text-accent-foreground font-bold mx-auto mb-4">
@@ -72,7 +78,10 @@ export default function SignIn() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Email
             </label>
             <Input
@@ -89,7 +98,10 @@ export default function SignIn() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
               Password
             </label>
             <Input
@@ -105,18 +117,14 @@ export default function SignIn() {
             />
           </div>
 
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="w-full gap-2"
-          >
+          <Button type="submit" disabled={isLoading} className="w-full gap-2">
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Signing in...
               </>
             ) : (
-              'Sign In'
+              "Sign In"
             )}
           </Button>
         </form>
@@ -137,12 +145,15 @@ export default function SignIn() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Don't have an account?{' '}
-          <Link href="/auth/signup" className="text-accent hover:text-accent/80 font-medium">
+          Don't have an account?{" "}
+          <Link
+            href="/auth/signup"
+            className="text-accent hover:text-accent/80 font-medium"
+          >
             Sign up
           </Link>
         </p>
       </Card>
     </div>
-  )
+  );
 }

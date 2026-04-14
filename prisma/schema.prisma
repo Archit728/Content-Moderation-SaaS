@@ -12,18 +12,28 @@ datasource db {
 }
 
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
+  id        String   @id @default(cuid())
+  email     String   @unique
   password  String
-  role      Role       @default(USER)
-  apiKey    String     @unique @default(cuid())
-  
+  role      Role     @default(USER)
+  apiKey    String   @unique @default(cuid())
+
+  // NEW: profile fields (safe additive)
+  firstName String?
+  lastName  String?
+  username  String?  @unique
+
+  // relations
   moderationLogs ModerationLog[]
   thresholds     Threshold[]
   batchJobs      BatchJob[]
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+
+  // NEW: subscriptions + usage tracking
+  subscription   Subscription?
+  apiUsage       ApiUsage?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -32,51 +42,52 @@ enum Role {
 }
 
 model ModerationLog {
-  id            String     @id @default(cuid())
+  id            String   @id @default(cuid())
   userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  text          String     @db.Text
-  probabilities Json       // { "toxic": 0.85, "severe_toxic": 0.2, ... }
-  flagged       Boolean    @default(false)
-  
-  createdAt     DateTime   @default(now())
-  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  text          String   @db.Text
+  probabilities Json
+  flagged       Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+
   @@index([userId])
   @@index([createdAt])
 }
 
 model Threshold {
-  id            String     @id @default(cuid())
-  label         String     // "toxic", "severe_toxic", "threat", etc.
-  value         Float      @default(0.5)
-  userId        String?
-  user          User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  
+  id        String  @id @default(cuid())
+  label     String
+  value     Float   @default(0.5)
+
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([label, userId])
   @@index([userId])
 }
 
 model BatchJob {
-  id              String     @id @default(cuid())
-  userId          String
-  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  status          JobStatus  @default(PENDING)
-  fileName        String
-  totalRows       Int
-  processedRows   Int        @default(0)
-  flaggedCount    Int        @default(0)
-  
-  results         Json?      // Store batch results as JSON
-  error           String?
-  
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status        JobStatus  @default(PENDING)
+  fileName      String
+  totalRows     Int
+  processedRows Int        @default(0)
+  flaggedCount  Int        @default(0)
+
+  results       Json?
+  error         String?
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
   @@index([userId])
   @@index([status])
 }
@@ -86,4 +97,59 @@ enum JobStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+//
+// ============================
+// NEW FEATURE: SUBSCRIPTIONS
+// ============================
+//
+
+model Subscription {
+  id        String @id @default(cuid())
+  userId    String @unique
+
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier      SubscriptionTier @default(FREE)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  monthlyApiLimit   Int @default(500)
+  monthlyBatchLimit Int @default(1000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+//
+// ============================
+// NEW FEATURE: API USAGE TRACKING
+// ============================
+//
+
+model ApiUsage {
+  id        String @id @default(cuid())
+  userId    String @unique
+
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  currentMonthApiCalls   Int @default(0)
+  currentMonthBatchCalls Int @default(0)
+
+  lastResetDate DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
