@@ -242,7 +242,7 @@ export function APIAccessTab() {
         </h3>
         <div className="bg-muted p-4 rounded-lg overflow-x-auto">
           <pre className="text-xs font-mono text-muted-foreground">
-            {`curl -X POST https://api.contentguard.dev/api/moderate \\
+            {`curl -X POST https://api.contentguard.dev/api/v1/moderate \\
   -H "Authorization: Bearer ${maskedKey}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -255,7 +255,7 @@ export function APIAccessTab() {
           size="sm"
           className="mt-3 gap-2"
           onClick={() => {
-            copyToClipboard(`curl -X POST https://api.contentguard.dev/api/moderate \\
+            copyToClipboard(`curl -X POST https://api.contentguard.dev/api/v1/moderate \\
   -H "Authorization: Bearer ${stats.apiKey}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -276,7 +276,7 @@ export function APIAccessTab() {
         <div className="bg-muted p-4 rounded-lg overflow-x-auto">
           <pre className="text-xs font-mono text-muted-foreground">
             {`const response = await fetch(
-  'https://api.contentguard.dev/api/moderate',
+  'https://api.contentguard.dev/api/v1/moderate',
   {
     method: 'POST',
     headers: {
@@ -297,7 +297,7 @@ const result = await response.json();`}
           className="mt-3 gap-2"
           onClick={() => {
             copyToClipboard(`const response = await fetch(
-  'https://api.contentguard.dev/api/moderate',
+  'https://api.contentguard.dev/api/v1/moderate',
   {
     method: 'POST',
     headers: {
